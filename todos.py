@@ -35,9 +35,22 @@ def main(param_dict, debug = False):
 
     # Remove item it presented
     remove_todo_item(todo_list=todo_list,done_list=done_list,todos=todos,code=param_dict["-rm"],debug=debug)
+
+    # Put last code in read
     
 
 def remove_todo_item(todo_list, done_list, todos, code, debug=False):
+    """ 
+    Remove todo item and write it to the done_list. 
+
+    Parameters: 
+    -----------
+      todo_list : Path to todo-list
+      done_list : Path to done-list
+      todos : Dictionary holding all open todo items. 
+      code : Code to be removed
+
+    """
     func = "remove_todo_item"
  
     if not code:
@@ -56,7 +69,10 @@ def remove_todo_item(todo_list, done_list, todos, code, debug=False):
     tmp = []
     with open(todo_list, "r") as todoList:
         tdl = todoList.readlines()
-        for line in tdl: 
+        for lnum, line in enumerate(tdl, start=1):
+            if lnum == 1: 
+                tmp.append(line.strip())
+                continue 
             _code=line.split(":")[1].strip("() ")
             if _code == code: 
                 write_done_item(path=done_list,item=line.strip(),debug=debug)
@@ -125,14 +141,16 @@ def read_todos_list(path, read, cat, debug=False):
 
     with open(path,"r") as infile_data:
         ifd=infile_data.readlines()
-        for lnum, line in enumerate(ifd):
+        for lnum, line in enumerate(ifd, start=1):
             line = line.strip()
-            if not line: continue
-            if line.startswith("#"): continue
+ 
+            if lnum == 1:
+                lastcode = line.split("Latest-Code = ")[-1]
+
             todofound = RE_TODO_ITEM.search(line)
             if todofound:
                 code = todofound.group("code")
-                lastcode = compare_codes(code, lastcode, debug=debug)
+                #lastcode = compare_codes(code, lastcode, debug=debug)
                 date = todofound.group("date")
                 category = todofound.group("category")
                 desc = todofound.group("desc")
@@ -144,6 +162,9 @@ def read_todos_list(path, read, cat, debug=False):
     
     if len(todos) == 0 and read:
         print("%s: No todos found within the todos-list"%(PRG)) 
+
+    if len(todos) != 0 and lastcode == "0x0":
+        raise RuntimeError("(%s): Mismatch with latest-code (%s). Please check."%(func, lastcode))
 
 
     # todoslist done reading
@@ -228,6 +249,13 @@ def write_todo_item(path, cat, todo, code, debug=False):
     
     with open(path,"a+") as todolist:
         todolist.write("TODO: (%s): (%s): (%s): %s\n"%(code,ctds,cat,todo))
+
+    # rewrite first line to update latest-code
+    with open(path,"r") as todolist: 
+        tdl = todolist.readlines()
+    tdl[0] = "Latest-Code = %s\n"%(code)
+    with open(path, "w") as _file: 
+        _file.writelines(tdl)
    
     return  
 
