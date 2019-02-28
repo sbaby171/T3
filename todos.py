@@ -255,7 +255,7 @@ def write_todo_item(path, cat, todo, code, debug=False):
         tdl = todolist.readlines()
     tdl[0] = "Latest-Code = %s\n"%(code)
     with open(path, "w") as _file: 
-        _file.writelines(tdl)
+        _file.writelines(tdl) 
    
     return  
 
