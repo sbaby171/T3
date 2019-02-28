@@ -10,6 +10,7 @@ from collections import OrderedDict
 
 PRG = "TODOs"
 
+__author__ = "Max Sbabo, GIT: sbaby171"
 
 def main(param_dict, debug = False):
     func = "main"
