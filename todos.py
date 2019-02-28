@@ -1,4 +1,4 @@
-#!/home/utils/Python-2.7.13/bin/python
+#!/usr/bin/env python
 
 import csv
 import os
@@ -16,6 +16,7 @@ def main(param_dict, debug = False):
 
     cwd = os.getcwd()
     todo_list = cwd + "/todo_list"
+    done_list = cwd + "/done/done_list"
 
     cats = {}
     todos = {}
@@ -23,15 +24,76 @@ def main(param_dict, debug = False):
     
     # Read in current categories file: 
     cats = read_categories(path=cwd + "/categories",debug=debug)
+    # TODO: Make this category readin optional. The category description file is not needed.
 
     # Read in the current todos list: 
     todos, lastcode = read_todos_list(path=todo_list, read=param_dict["-read"],cat=param_dict["-cat"],debug=debug)
 
     # Add new object to todo-list
-    write_todo_item(path=cwd+"/todo_list",cat=param_dict["-cat"],todo=param_dict["-todo"],code=next_code(lastcode),debug=debug)
+    write_todo_item(path=todo_list,cat=param_dict["-cat"],todo=param_dict["-todo"],code=next_code(lastcode),debug=debug)
 
-
+    # Remove item it presented
+    remove_todo_item(todo_list=todo_list,done_list=done_list,todos=todos,code=param_dict["-rm"],debug=debug)
     
+
+def remove_todo_item(todo_list, done_list, todos, code, debug=False):
+    func = "remove_todo_item"
+ 
+    if not code:
+        return 
+
+    if not os.path.isfile(todo_list):
+        raise RuntimeError("(%s): File does not exist.\n  - Checked file = %s"%(func, todo_list)) 
+
+    if not os.path.isfile(done_list):
+        raise RuntimeError("(%s): File does not exist.\n  - Checked file = %s"%(func, done_list)) 
+
+    if code not in todos:
+        raise RuntimeError("(%s): Code (%s) was not found in todos list."%(func, code))
+
+
+    tmp = []
+    with open(todo_list, "r") as todoList:
+        tdl = todoList.readlines()
+        for line in tdl: 
+            _code=line.split(":")[1].strip("() ")
+            if _code == code: 
+                write_done_item(path=done_list,item=line.strip(),debug=debug)
+            else: 
+                tmp.append(line.strip())
+
+    with open(todo_list+".new", "w") as newfile:
+        for item in tmp:    
+            newfile.write(item+"\n")
+  
+    os.popen("cp %s %s"%(todo_list, todo_list+".bak"))
+    os.popen("mv %s %s"%(todo_list+".new", todo_list))
+
+
+           
+
+
+
+def write_done_item(path, item, debug=False):
+    func = "write_done_item"
+    
+    if not os.path.isfile(path):
+        raise RuntimeError("(%s): File does not exist.\n  - Checked file = %s"%(func, path)) 
+
+    ctd  = datetime.datetime.now()
+    ctds = "%s/%s/%s"%(ctd.month,ctd.day,ctd.year) 
+    with open(path, "a+") as donelist: 
+        front = item.split(":")[:2]
+        date  = item.split(":")[2].strip("() ")
+        back  = item.split(":")[3:]
+
+        date = ": (Start=%s - Finished=%s)"%(date,ctds)
+        x = "".join(front) + date + ":".join(back)
+        x = x.strip("TODO: ")
+
+        donelist.write("DONE: %s\n"%x)
+
+   
     
 def read_todos_list(path, read, cat, debug=False): 
     """ 
@@ -59,6 +121,7 @@ def read_todos_list(path, read, cat, debug=False):
 
     if not os.path.isfile(path):
         raise RuntimeError("(%s): File does not exist.\n  - Checked file = %s"%(func, path))    
+
     with open(path,"r") as infile_data:
         ifd=infile_data.readlines()
         for lnum, line in enumerate(ifd):
@@ -149,18 +212,19 @@ def write_todo_item(path, cat, todo, code, debug=False):
     """
     func = "write_todo_item"
  
-    if (not cat) or (not todo):
-        if debug: print("DEBUG: (%s): Warning, no category or description was provided. Skipping function."%(func))
+    if not todo:
+        if debug: print("DEBUG: (%s): Warning, No '-todo' was provided. Skipping function."%(func))
         return 
+
+    if todo and not cat: 
+        raise RuntimeError("(%s): Must provide a category for the todo item."%(func))
 
     if not os.path.isfile(path):
         raise RuntimeError("(%s): File does not exist.\n  - Checked file = %s"%(func, path))
-    # Generate date stamp: 
-    # --------------------
+    
     ctd  = datetime.datetime.now()
     ctds = "%s/%s/%s"%(ctd.month,ctd.day,ctd.year) 
-    # Append todo item to the list
-    # ----------------------------
+    
     with open(path,"a+") as todolist:
         todolist.write("TODO: (%s): (%s): (%s): %s\n"%(code,ctds,cat,todo))
    
@@ -222,12 +286,14 @@ def handle_cmd_args(args = None, debug = False):
                    "-todo": "", 
                    "-cat" : "",
                    "-read": False,
+                   "-rm" : "",
                   } 
     lookup_desc = {"-debug" : "(optiona;): (Default=False): Debug flag. If true, state details of program will be provided to console.",
                    "-help"  : "(optional): Display help menu.",
-                   "-cat"  : "(optional): Category",
-                   "-read": "(optional): Print todos list. Can be used with '-cat' to print todos only related to given category.",
-                   "-todo" : "(optional):String decription of execution. String must be enclosed by quotations.\n" + 
+                   "-cat"   : "(optional): Category",
+                   "-rm"    : "(optional): Remove todo item by code",
+                   "-read"  : "(optional): Print todos list. Can be used with '-cat' to print todos only related to given category.",
+                   "-todo"  : "(optional):String decription of execution. String must be enclosed by quotations.\n" + 
 "         Ex)  -todo \"Call your mother.\""
                   }
     if ("-help" in args) or ("-h" in args): 
@@ -288,6 +354,8 @@ def handle_cmd_args(args = None, debug = False):
     #if not lookup_dict["-todo"]:
     #    print("ERROR: (func%s): Command line option (%s) is mandatory! Exiting!"%(func, "-note"))
     #    print_help_menu(); sys.exit(1)
+    #if lookup_dict["-rm"]:
+    #    lookup_dict["-rm"]= hex(lookup_dict["-rm"]) 
 
     if (debug):  
         for key in lookup_dict:
